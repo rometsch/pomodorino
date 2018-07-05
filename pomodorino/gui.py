@@ -13,8 +13,11 @@ import matplotlib
 matplotlib.use("Qt4Agg")
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
-import alsaaudio
 
+try:
+    import alsaaudio
+except ModuleNotFoundError:
+    useAudio = False
 
 class PomoWindow(QtGui.QWidget):
     def __init__(self, pomo):
@@ -26,12 +29,13 @@ class PomoWindow(QtGui.QWidget):
         # Enhance readability
         self.getString = self.pomo.getString
         self.initUI()
-        self.initAudio()
+        if useAudio:
+            self.initAudio()
         self.timerActive = False
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.tick)
 
-    def initUI(self):      
+    def initUI(self):
         """
         Initializes the UI.
         """
@@ -43,27 +47,27 @@ class PomoWindow(QtGui.QWidget):
         self.trayIcon = QtGui.QSystemTrayIcon(QtGui.QIcon('/usr/share/icons/pomodorino.png'), self)
         self.trayIcon.setVisible(True)
         self.trayIcon.activated.connect(self.trayClick)
-        
+
 
         # Add a minimal context menu for the tray icon.
         #trayMenu = QtGui.QMenu(self)
         #trayMenu.addAction("Quit", self.close)
         #self.trayIcon.setContextMenu(trayMenu)
-        
+
         # Initialize and display the tabs
         pomoTab = self.initPomoTab()
         tasksTab = self.initTasksTab()
         activityTab = self.initActivityTab()
-        
+
         tabWidget = QtGui.QTabWidget(self)
         tabWidget.resize(479,309)
-        
+
         tabWidget.addTab(pomoTab, self.getString("tab_pomo"))
         tabWidget.addTab(tasksTab, self.getString("tab_tasks"))
         tabWidget.addTab(activityTab, self.getString("tab_activity"))
 
         self.show()
-        
+
     def initAudio(self):
         """
         Detects an ALSA audio device and buffers our ringtone.
@@ -77,7 +81,7 @@ class PomoWindow(QtGui.QWidget):
         self.audioDevice.setrate(ring.getframerate())
         self.audioDevice.setformat(alsaaudio.PCM_FORMAT_S16_LE)
         self.audioDevice.setperiodsize(320)
-        
+
         # Read the audio data of the ringtone.
         self.audioData = list()
         buf = ring.readframes(320)
@@ -91,7 +95,7 @@ class PomoWindow(QtGui.QWidget):
         """
         if self.timerActive:
             self.stopTimer()
-            
+
             if self.promptUser("ask_paused"):
                 event.accept()
             else:
@@ -160,7 +164,7 @@ class PomoWindow(QtGui.QWidget):
                 self.setVisible(False)
             else:
                 self.setVisible(True)
-    
+
     def promptUser(self, identifier, additional=None):
         """
         Creates predefined confirmation/warning dialogs.
@@ -182,7 +186,7 @@ class PomoWindow(QtGui.QWidget):
         elif identifier == 'ask_taskdel' and additional != None:
             askText = self.getString("ask_taskdel_text")
             askText = str.replace(askText, "%taskname%", str(additional))
-            
+
             reply = QtGui.QMessageBox.question(self, self.getString("ask_taskdel_title"), askText,
                                                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
 
@@ -197,7 +201,7 @@ class PomoWindow(QtGui.QWidget):
     ##############
     ## Pomo Tab ##
     ##############
-        
+
     def initPomoTab(self):
         """
         Creates the layout of the pomodoro tab
@@ -220,7 +224,7 @@ class PomoWindow(QtGui.QWidget):
         tasks = self.pomo.pomoData.tasks
         for taskID, taskName, pomoCount, pomoLast in tasks:
             taskBar.addItem(taskName, None)
-        
+
         # Create the main button.
         mainBtn = QtGui.QPushButton(self.getString("btn_start"), pomoTab)
         mainBtn.setFixedSize(180, 60)
@@ -231,7 +235,7 @@ class PomoWindow(QtGui.QWidget):
         timeBtn.setToolTip(self.getString("ttp_regularpomo"))
         timeBtn.setFixedSize(50, 25)
         timeBtn.setStyleSheet('font-size: 9pt;')
-        
+
         # Create the 50 min button.
         longTimeBtn = QtGui.QPushButton(self.getString("lbl_longpomo"), pomoTab)
         longTimeBtn.setToolTip(self.getString("ttp_longpomo"))
@@ -249,7 +253,7 @@ class PomoWindow(QtGui.QWidget):
         longPauseBtn.setToolTip(self.getString("ttp_longpause"))
         longPauseBtn.setFixedSize(50, 25)
         longPauseBtn.setStyleSheet('font-size: 9pt;')
-        
+
         # Select 25 min button as default on startup.
         timeBtn.setDisabled(True)
         self.pomoButtonActive = timeBtn
@@ -269,7 +273,7 @@ class PomoWindow(QtGui.QWidget):
         # Create and set the layout.
         firstRow = QtGui.QHBoxLayout()
         firstRow.addWidget(taskBar)
-        
+
         secondRow = QtGui.QHBoxLayout()
         secondRow.addStretch()
         secondRow.addWidget(pauseBtn)
@@ -278,10 +282,10 @@ class PomoWindow(QtGui.QWidget):
         secondRow.addWidget(timeBtn)
         secondRow.addWidget(longTimeBtn)
         secondRow.addStretch()
-        
+
         thirdRow = QtGui.QHBoxLayout()
         thirdRow.addWidget(mainBtn)
-        
+
         vbox = QtGui.QVBoxLayout()
         vbox.addStretch()
         vbox.addLayout(firstRow)
@@ -290,9 +294,9 @@ class PomoWindow(QtGui.QWidget):
         vbox.addStretch()
         vbox.addLayout(thirdRow)
         vbox.addStretch()
-        
-        pomoTab.setLayout(vbox) 
-        
+
+        pomoTab.setLayout(vbox)
+
         return pomoTab
 
     def onClicked(self):
@@ -302,7 +306,7 @@ class PomoWindow(QtGui.QWidget):
         sender = self.sender()
         if sender == self.pomoBtns['main']:
             return self.onClickedPomoMain()
-            
+
         elif (sender == self.pomoBtns['pause'] or
               sender == self.pomoBtns['longPause'] or
               sender == self.pomoBtns['time'] or
@@ -310,7 +314,7 @@ class PomoWindow(QtGui.QWidget):
             return self.onClickedPomoTime()
 
         raise ValueError()
-    
+
     def onClickedPomoMain(self):
         """
         Starts/Stops the timer depending on the state of the button.
@@ -341,18 +345,18 @@ class PomoWindow(QtGui.QWidget):
                 self.startTimer(timeSpan)
             else:
                 self.promptUser("warn_notask")
-        
+
     def onClickedPomoTime(self):
         """
         Toggles the state of the timer buttons in the pomo tab.
         """
         sender = self.sender()
-        
+
         if self.pomoBtns['main'].text() == 'start':
             self.pomoButtonActive.setDisabled(False)
             sender.setDisabled(True)
             self.pomoButtonActive = sender
-            
+
             if sender == self.pomoBtns['pause'] or sender == self.pomoBtns['longPause']:
                 self.pomoTaskBar.setDisabled(True)
             else:
@@ -362,9 +366,9 @@ class PomoWindow(QtGui.QWidget):
         """
         Resets the button states in the pomo tab.
         """
-        if self.pomoButtonActive != self.pomoBtns['pause'] and self.pomoButtonActive != self.pomoBtns['longPause']:   
+        if self.pomoButtonActive != self.pomoBtns['pause'] and self.pomoButtonActive != self.pomoBtns['longPause']:
             self.pomoTaskBar.setDisabled(False)
-            
+
         self.pomoBtns['main'].setText("start")
         for k,v in self.pomoBtns.items():
             if k != 'main' and v is not self.pomoButtonActive:
@@ -372,18 +376,18 @@ class PomoWindow(QtGui.QWidget):
 
         # Also reset the window title.
         self.setTitle(None)
-            
+
     def tick(self):
         """
         Updates the GUI every second when the timer is running.
         """
         self.timerCount -= 1
-        
-        timeStr = "{0:0>2}:{1:0>2}".format(math.floor(self.timerCount / 60), self.timerCount % 60) 
+
+        timeStr = "{0:0>2}:{1:0>2}".format(math.floor(self.timerCount / 60), self.timerCount % 60)
         self.pomoBtns['main'].setText(timeStr)
         # Show current time in the title.
         self.setTitle(timeStr)
-            
+
         # Timer finished?
         if self.timerCount == 0:
             self.playRingtone()
@@ -410,7 +414,7 @@ class PomoWindow(QtGui.QWidget):
     ###############
     ## tasks tab ##
     ###############
-    
+
     def initTasksTab(self):
         """
         Creates the layout of the tasks tab.
@@ -421,7 +425,7 @@ class PomoWindow(QtGui.QWidget):
         self.tasksVBox = QtGui.QVBoxLayout()
         self.tasksVBox.addWidget(self.tasksTable)
         self.tasksTable.sortItems(0)
-        
+
         tasksTab.setLayout(self.tasksVBox)
         return tasksTab
 
@@ -443,7 +447,7 @@ class PomoWindow(QtGui.QWidget):
         table.setHorizontalHeaderLabels([self.getString("lbl_stats_task"), self.getString("lbl_stats_pomos"), self.getString("lbl_stats_last")])
         table.verticalHeader().setVisible(False)
         table.horizontalHeader().setHighlightSections(False)
-        
+
         # Create a context menu for the table.
         def ctMenuEvent(event):
             self.taskTableSelChange = False
@@ -456,7 +460,7 @@ class PomoWindow(QtGui.QWidget):
                     dlAct.setEnabled(False)
 
         table.contextMenuEvent = ctMenuEvent
-        
+
         # Columwidth depends on the existence of a scrollbar.
         if len(tasks) <= 7:
             table.setColumnWidth(0, 345)
@@ -464,7 +468,7 @@ class PomoWindow(QtGui.QWidget):
             table.setColumnWidth(0, 329)
         table.setColumnWidth(1, 48)
         table.setColumnWidth(2, 60)
-        
+
         # There must be a row counter since the taskID can be different.
         rowCount = 0
 
@@ -482,7 +486,7 @@ class PomoWindow(QtGui.QWidget):
             item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)
             item.setToolTip("~" + str(round((pomoCount * 25) / 60, 1)) + "h")
             table.setItem(rowCount, 1, item)
-            
+
             # Third column: pomoLast
             pomoLastDate = datetime.datetime.fromtimestamp(pomoLast)
             item = QtGui.QTableWidgetItem()
@@ -516,7 +520,7 @@ class PomoWindow(QtGui.QWidget):
         if self.taskTableSelChange == False:
             self.tasksTable.clearSelection()
         self.taskTableSelChange = False
-        
+
     def deleteTask(self):
         """
         Deletes a task by the users request.
@@ -527,16 +531,16 @@ class PomoWindow(QtGui.QWidget):
             # Delete entry from GUI
             pbID = self.pomoTaskBar.findText(taskName)
             self.pomoTaskBar.removeItem(pbID)
-        
+
             stID = self.activitySelTask.findText(taskName)
             self.activitySelTask.removeItem(stID)
 
             rownum = self.tasksTable.row(self.tasksTable.selectedItems()[0])
             self.tasksTable.removeRow(rownum)
-            
+
             if self.tasksTable.rowCount() <= 7:
                 self.tasksTable.setColumnWidth(0, 345)
-            
+
             # Delete entry from db and cache
             taskID = self.pomo.pomoData.getTaskID(taskName)
             self.pomo.pomoData.delTask(taskID)
@@ -557,13 +561,13 @@ class PomoWindow(QtGui.QWidget):
             except KeyError:
                 # Update entry in GUI
                 self.tasksTable.selectedItems()[0].setText(name)
-                
+
                 pbID = self.pomoTaskBar.findText(oldname)
                 self.pomoTaskBar.setItemText(pbID, name)
 
                 stID = self.activitySelTask.findText(oldname)
                 self.activitySelTask.setItemText(stID, name)
-                
+
                 # Update entry in db and cache
                 tID = self.pomo.pomoData.getTaskID(oldname)
                 self.pomo.pomoData.renameTask(tID, name)
@@ -577,10 +581,10 @@ class PomoWindow(QtGui.QWidget):
         Creates the layout of the activity tab and prepares the graph.
         """
         activityTab = QtGui.QWidget()
-        
+
         # Get the background color of the window to make the graph fit in.
         color = self.palette().color(QtGui.QPalette.Background)
-        
+
         # Create a fixed-size canvas for the graph.
         self.figure = plt.figure(facecolor=color.name(), tight_layout=False)
         self.canvas = FigureCanvas(self.figure)
@@ -597,7 +601,7 @@ class PomoWindow(QtGui.QWidget):
         selTask.insertItem(0, self.getString("lbl_stats_all"), None)
         for tID, tskName, pomoCount, pomoLast in self.pomo.pomoData.tasks:
             selTask.addItem (tskName, None)
-            
+
         selTask.currentIndexChanged['QString'].connect(self.onChangeTask)
         # Save handle for later use.
         self.activitySelTask = selTask
@@ -624,7 +628,7 @@ class PomoWindow(QtGui.QWidget):
         leftButton.clicked.connect(self.timeNavigate)
         # Save the handle for toggling the button state
         self.leftButtonHandle = leftButton
-        
+
         rightButton = QtGui.QPushButton(">", activityTab)
         rightButton.setStyleSheet('font-size: 12pt;')
         rightButton.setFixedSize(30,20)
@@ -645,7 +649,7 @@ class PomoWindow(QtGui.QWidget):
         zoomOutButton.clicked.connect(self.timeZoom)
         # Save the handle for toggling the button state.
         self.zoomOutButtonHandle = zoomOutButton
-        
+
         zoomInButton = QtGui.QPushButton("+", activityTab)
         zoomInButton.setStyleSheet('font-size: 12pt;')
         zoomInButton.setFixedSize(30,20)
@@ -656,7 +660,7 @@ class PomoWindow(QtGui.QWidget):
 
         # Get highest pomo count on a single day.
         self.highestPomoCount = list()
-        
+
         self.highestPomoCount.append(self.pomo.pomoData.getHighestPomoCountMonthly())
         self.highestPomoCount.append(self.pomo.pomoData.getHighestPomoCountWeekly())
         self.highestPomoCount.append(self.pomo.pomoData.getHighestPomoCountDaily())
@@ -679,7 +683,7 @@ class PomoWindow(QtGui.QWidget):
         layout2.addWidget(selTask)
         layout.addLayout(layout2)
 
-        activityTab.setLayout(layout) 
+        activityTab.setLayout(layout)
         return activityTab
 
     def fillActivityTab(self):
@@ -710,12 +714,12 @@ class PomoWindow(QtGui.QWidget):
             beginInt = datetime.datetime(today.year, today.month, 1, 0, 0, 0)
             shiftDelta = 30 * delta
         self.shiftDelta = shiftDelta
-        
+
         # Get the data of the last units since today.
         units = list()
         values = list()
         size = 6 + self.intervalScale
-        
+
         for i in range(size):
             # Shift
             offset = (size-i-1-self.intervalShift)
@@ -731,7 +735,7 @@ class PomoWindow(QtGui.QWidget):
                 if newMon == 0:
                     newMon = 12
                     yearDiff += 1
-                
+
                 shiftedBegin = datetime.datetime(beginInt.year - yearDiff, newMon, 1, 0, 0, 0)
             shiftedEnd = datetime.datetime
 
@@ -773,9 +777,9 @@ class PomoWindow(QtGui.QWidget):
 
         # y-Limit of the graph depends on the maximum bar height.
         yLim = self.highestPomoCount[self.intervalScale-1] * 1.24
-        
+
         # To avoid rescaling the graph when changing the task, we lock the
-        # y-Limit to the first one generated after startup.  
+        # y-Limit to the first one generated after startup.
         if self.lockYLim is False:
             if yLim == 0:
                 # When no pomodoros have been done, use a constant y-Limit.
@@ -787,8 +791,8 @@ class PomoWindow(QtGui.QWidget):
             # Update the y-Limit when it exceeds the saved one.
             if yLim > self.yLim:
                 self.yLim = yLim
-        
-        # Set the graph limits.        
+
+        # Set the graph limits.
         ax.set_ylim([0, self.yLim])
         ax.set_xlim([0.5, size+0.5])
 
@@ -805,8 +809,8 @@ class PomoWindow(QtGui.QWidget):
             tempDate = beginInt - (size-1-self.intervalShift) * shiftDelta
             dateString = tempDate.strftime("%b %Y")
             if self.intervalScale != 3:
-                dateString = tempDate.strftime("%Y") 
-                
+                dateString = tempDate.strftime("%Y")
+
             plt.text(0.99, 0.937, dateString, horizontalalignment='right', verticalalignment='center', transform=ax.transAxes, weight="bold")
 
         # Show.
@@ -817,7 +821,7 @@ class PomoWindow(QtGui.QWidget):
         Handling function for the navigation buttons in the activity tab.
         """
         sender = self.sender()
-        
+
         if sender.text() == '<':
             self.intervalShift -= 6
             self.rightButtonHandle.setDisabled(False)
@@ -854,7 +858,7 @@ class PomoWindow(QtGui.QWidget):
         Handling function for the zoom buttons in the activity tab.
         """
         sender = self.sender()
-        
+
         # Always reset the navigation while zooming
         self.intervalShift = 0
         self.lockYLim = False
@@ -864,7 +868,7 @@ class PomoWindow(QtGui.QWidget):
             self.farLeftButtonHandle.setDisabled(False)
         self.rightButtonHandle.setDisabled(True)
         self.farRightButtonHandle.setDisabled(True)
-        
+
         # Zoom Out:
         if sender.text() == '−':
             self.intervalScale -= 1
